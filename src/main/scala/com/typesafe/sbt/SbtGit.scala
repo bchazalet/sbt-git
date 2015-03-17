@@ -67,10 +67,16 @@ object SbtGit extends AutoPlugin {
       import extracted._
       val reader = extracted.get(GitKeys.gitReader)
       implicit val branches: Seq[String] = reader.withGit(_.allBranches)
-      token(Space ~> gitCommand <~ Space) ~ token(revision)
+      // token(Space ~> gitCommand <~ Space) ~ token(revision)
+      token(Space ~> branchCompletableCommand) ~ (Space ~> token(revision)).*
     }
     
-    val gitCommand: Parser[Seq[Char]] = charClass(_ => true, "git main command").+.examples("<command>", "checkout", "merge", "mergetool", "log", "stash", "tag", "branch", "add", "status", "diff", "commit", "reset", "rm", "mv")
+    // commands for which we should suggest branch names
+    val branchCompletable = Set("checkout", "merge")
+        
+    // let's not forget the user can define its own git commands and aliases so we don't really parse the command
+    // we only provide suggestions
+    val branchCompletableCommand: Parser[Seq[Char]] = charClass(_ => true, "git main command").+.examples(branchCompletable.toSet)
     
     def revision(implicit branches: Seq[String]): Parser[Seq[Char]] = charClass(_ => true, "git revision").+.examples(branches.toSet)
     
