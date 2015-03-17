@@ -50,41 +50,31 @@ object SbtGit extends AutoPlugin {
       state2
     }
     
-    val justPrint: (State, Seq[String]) => State = { (state, args) =>
-      state
+    // the git command we expose to the user
+    val command: Command = Command("git")(s =>  fullCommand(s)){ (state, arg) =>
+      val (command, args) = arg
+      val all = command.mkString +: args.map(_.mkString)
+      action(state, all)
     }
-
-    // <arg> is the suggestion printed for tab completion on an argument
-    val command: Command = Command.args("git", "<args>")(action)
     
     import complete._
     import complete.DefaultParsers._
     import sbt._
     
+    // the parser providing auto-completion for git command
     def fullCommand(state: State) = {
       val extracted = Project.extract(state)
       import extracted._
       val reader = extracted.get(GitKeys.gitReader)
-      implicit val branches: Seq[String] = reader.withGit(_.allBranches)
-      // token(Space ~> gitCommand <~ Space) ~ token(revision)
-      token(Space ~> branchCompletableCommand) ~ (Space ~> token(revision)).*
+      // TODO add remote branches too
+      implicit val branches: Seq[String] = reader.withGit(_.allBranches) :+ "HEAD"
+      // let's not forget the user can define its own git commands and aliases so we don't want to parse the command
+      // TODO we could though provide a list of available git commands
+      // TODO some git commands like add take filepaths as arguments
+      token(Space) ~> token(NotQuoted, "<command>") ~ (Space ~> token(branch)).*
     }
     
-    // commands for which we should suggest branch names
-    val branchCompletable = Set("checkout", "merge")
-        
-    // let's not forget the user can define its own git commands and aliases so we don't really parse the command, we only provide suggestions
-    // we parse the command, whatever it is until we encounter a space
-    val branchCompletableCommand: Parser[Seq[Char]] = charClass(!_.isSpaceChar, "git main command").+.examples(branchCompletable.toSet)
-    
-    def revision(implicit branches: Seq[String]): Parser[Seq[Char]] = charClass(!_.isSpaceChar, "git revision").+.examples(branches.toSet)
-    
-    // how do I make the parser depend on the state in order to get access to the git reader?
-    def commandGitTest: Command = Command("git-test")(s =>  fullCommand(s)){ (state, arg) =>
-      val (command, args) = arg
-      val all = command.mkString +: args.map(_.mkString)
-      action(state, all)
-    }
+    def branch(implicit branches: Seq[String]): Parser[String] = NotQuoted.examples(branches.toSet)
     
     private def isGitRepo(dir: File): Boolean = {
       if (System.getenv("GIT_DIR") != null) true
@@ -129,7 +119,7 @@ object SbtGit extends AutoPlugin {
   )
   override val projectSettings = Seq(
     // Input task to run git commands directly.
-    commands ++= Seq(GitCommand.command, GitCommand.commandGitTest)
+    commands += GitCommand.command
   )
 
   /** A Predefined setting to use JGit runner for git. */
