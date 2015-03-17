@@ -19,6 +19,7 @@ object SbtGit extends AutoPlugin {
     // Note: These are all grabbed using jgit currently.
     val gitReader = SettingKey[ReadableGit]("git-reader", "This gives us a read-only view of the git repository.")
     val gitBranch = SettingKey[Option[String]]("git-branch", "Target branch of a git operation")
+    val gitBranches = SettingKey[Seq[String]]("git-branches", "All branches found in this repository")
     val gitCurrentBranch = SettingKey[String]("git-current-branch", "The current branch for this project.")
     val gitCurrentTags = SettingKey[Seq[String]]("git-current-tags", "The tags associated with this commit.")
     val gitHeadCommit = SettingKey[Option[String]]("git-head-commit", "The commit sha for the top commit of this project.")
@@ -48,10 +49,38 @@ object SbtGit extends AutoPlugin {
       val result = runner(args:_*)(dir, state2.log)
       state2
     }
+    
+    val justPrint: (State, Seq[String]) => State = { (state, args) =>
+      println(args.mkString(" "))
+      state
+    }
 
     // <arg> is the suggestion printed for tab completion on an argument
     val command: Command = Command.args("git", "<args>")(action)
-
+    
+    import complete._
+    import complete.DefaultParsers._
+    import sbt._
+    
+    def fullCommand(state: State) = {
+      val extracted = Project.extract(state)
+      import extracted._
+      val reader = extracted.get(GitKeys.gitReader)
+      implicit val branches: Seq[String] = reader.withGit(_.allBranches)
+      token(Space ~> gitCommand <~ Space) ~ token(revision)
+    }
+    
+    val gitCommand: Parser[Seq[Char]] = charClass(_ => true, "git main command").+.examples("<command>", "checkout", "merge", "mergetool", "log", "stash", "tag", "branch", "add", "status", "diff", "commit", "reset", "rm", "mv")
+    
+    def revision(implicit branches: Seq[String]): Parser[Seq[Char]] = charClass(_ => true, "git revision").+.examples(branches.toSet)
+    
+    // how do I make the parser depend on the state in order to get access to the git reader?
+    def commandGitTest: Command = Command("git-test")(s =>  fullCommand(s)){ (state, arg) =>
+      val (command, revision) = arg
+      val all = command.mkString :: revision.mkString :: Nil
+      justPrint(state, all)
+    }
+    
     private def isGitRepo(dir: File): Boolean = {
       if (System.getenv("GIT_DIR") != null) true
       else isGitDir(dir)
@@ -95,7 +124,7 @@ object SbtGit extends AutoPlugin {
   )
   override val projectSettings = Seq(
     // Input task to run git commands directly.
-    commands += GitCommand.command
+    commands ++= Seq(GitCommand.command, GitCommand.commandGitTest)
   )
 
   /** A Predefined setting to use JGit runner for git. */

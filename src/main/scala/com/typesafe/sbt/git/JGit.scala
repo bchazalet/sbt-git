@@ -81,6 +81,8 @@ final class JGit(val repo: Repository) extends GitReadonlyInterface {
   
   override def hasUncommittedChanges: Boolean = porcelain.status.call.hasUncommittedChanges
   
+  override def allBranches : Seq[String] = branches.filter(_.getName.startsWith("refs/heads")).map(_.getName.drop(11))
+  
 }
 
 object JGit {
