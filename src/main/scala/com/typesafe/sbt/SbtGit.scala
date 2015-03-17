@@ -51,7 +51,6 @@ object SbtGit extends AutoPlugin {
     }
     
     val justPrint: (State, Seq[String]) => State = { (state, args) =>
-      println(args.mkString(" "))
       state
     }
 
@@ -74,16 +73,16 @@ object SbtGit extends AutoPlugin {
     // commands for which we should suggest branch names
     val branchCompletable = Set("checkout", "merge")
         
-    // let's not forget the user can define its own git commands and aliases so we don't really parse the command
-    // we only provide suggestions
-    val branchCompletableCommand: Parser[Seq[Char]] = charClass(_ => true, "git main command").+.examples(branchCompletable.toSet)
+    // let's not forget the user can define its own git commands and aliases so we don't really parse the command, we only provide suggestions
+    // we parse the command, whatever it is until we encounter a space
+    val branchCompletableCommand: Parser[Seq[Char]] = charClass(!_.isSpaceChar, "git main command").+.examples(branchCompletable.toSet)
     
-    def revision(implicit branches: Seq[String]): Parser[Seq[Char]] = charClass(_ => true, "git revision").+.examples(branches.toSet)
+    def revision(implicit branches: Seq[String]): Parser[Seq[Char]] = charClass(!_.isSpaceChar, "git revision").+.examples(branches.toSet)
     
     // how do I make the parser depend on the state in order to get access to the git reader?
     def commandGitTest: Command = Command("git-test")(s =>  fullCommand(s)){ (state, arg) =>
-      val (command, revision) = arg
-      val all = command.mkString :: revision.mkString :: Nil
+      val (command, args) = arg
+      val all = command.mkString +: args.map(_.mkString)
       action(state, all)
     }
     
