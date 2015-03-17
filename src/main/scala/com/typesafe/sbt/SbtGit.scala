@@ -78,7 +78,7 @@ object SbtGit extends AutoPlugin {
     def commandGitTest: Command = Command("git-test")(s =>  fullCommand(s)){ (state, arg) =>
       val (command, revision) = arg
       val all = command.mkString :: revision.mkString :: Nil
-      justPrint(state, all)
+      action(state, all)
     }
     
     private def isGitRepo(dir: File): Boolean = {
