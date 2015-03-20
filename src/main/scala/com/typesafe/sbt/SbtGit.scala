@@ -58,31 +58,14 @@ object SbtGit {
     // bash auto completion
     val bashCompletionScript = "/Users/bchazalet/.sbt-git-completion.bash"
     
-    val autoComplete: (State, Seq[String]) => State = { (state, args) =>
-      val extracted = Project.extract(state)
-      import extracted._
-      val dir = extracted.get(baseDirectory)
-      // TODO we need to handle the different modes TAB, ?, !, % etc
-      // TODO for now I am cheating, having a echo $COMPREPLY in the bash script
-      val completeArgs = "git" +: args
-      val bashArray = makeBashArray(completeArgs)
-      val variables = Seq(("COMP_WORDS" -> bashArray), ("COMP_CWORD" -> s"${completeArgs.size-1}"), ("COMP_TYPE" -> "TAB"))
-      val process = Process(bashCompletionScript, None, variables: _*)
-      val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
-      println(res)
-      // read COMPREPLY
-      state
-    }
-    
 //    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
 //      val (cmd, args) = t
 //      action(state, cmd +: args)
 //    }
     
-      val autoCompleteAction: (State, Seq[String]) => State = { (state, t) =>
-        action(state, t)
-      }
-    
+    val autoCompleteAction: (State, Seq[String]) => State = { (state, t) =>
+      action(state, t)
+    }
     
     def autoCompleteParser(state: State) = {
 
@@ -97,7 +80,8 @@ object SbtGit {
         val command = "git"
         val cur = "check"// word being completed
         val prev = "" // prev
-        val fullCommand = bashCompletionScript + s" $command $cur $prev"
+         // val fullCommand = bashCompletionScript + s" $command $cur $prev"
+        val fullCommand = bashCompletionScript
         val variables = Seq(("COMP_WORDS" -> bashArray), ("COMP_CWORD" -> s"${completeArgs.size-1}"), ("COMP_TYPE" -> "TAB"))
         val process = Process(fullCommand, None, variables: _*)
         val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
@@ -106,7 +90,15 @@ object SbtGit {
         res.split("\n").map(_.trim)
       }
       // TODO UGLY UGLY UGLY
-      (Space ~> token(NotQuoted, "<command>")).+.flatMap { all => println(all); (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
+      // (token(Space) ~> token(NotQuoted, "<command>")).flatMap { all => println(all); (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
+      def test(parts: Seq[String]) : Parser[String] = 
+        parts match {
+          case Seq() => token(Space) ~> token(NotQuoted, "command")
+          //case command :: Nil => NotQuoted.examples(suggestions(state, all): _*) // token(NotQuoted, "branch or whatever") 
+          //case all => token(NotQuoted, "another token")
+          case all => Space ~> NotQuoted.examples(suggestions(state, all): _*)
+      }
+      repeatDep(test, SpaceClass)
     }
     
     def makeBashArray(values: Seq[String]) = values.mkString("ARRAY=(", " ", ")")
