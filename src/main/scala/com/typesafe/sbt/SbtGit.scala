@@ -55,6 +55,70 @@ object SbtGit {
       state2
     }
 
+    // bash auto completion
+    val bashCompletionScript = "/Users/bchazalet/.sbt-git-completion.bash"
+    
+    val autoComplete: (State, Seq[String]) => State = { (state, args) =>
+      val extracted = Project.extract(state)
+      import extracted._
+      val dir = extracted.get(baseDirectory)
+      // TODO we need to handle the different modes TAB, ?, !, % etc
+      // TODO for now I am cheating, having a echo $COMPREPLY in the bash script
+      val completeArgs = "git" +: args
+      val bashArray = makeBashArray(completeArgs)
+      val variables = Seq(("COMP_WORDS" -> bashArray), ("COMP_CWORD" -> s"${completeArgs.size-1}"), ("COMP_TYPE" -> "TAB"))
+      val process = Process(bashCompletionScript, None, variables: _*)
+      val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
+      println(res)
+      // read COMPREPLY
+      state
+    }
+    
+    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
+      val (cmd, args) = t
+      action(state, cmd +: args)
+    }
+    
+    def autoCompleteParser(state: State) = {
+
+      def suggestions(state: State, args: Seq[String]): Seq[String] = {
+        val extracted = Project.extract(state)
+        import extracted._
+        val dir = extracted.get(baseDirectory)
+        // TODO we need to handle the different modes TAB, ?, !, % etc
+        // TODO for now I am cheating, having a echo $COMPREPLY in the bash script
+        val completeArgs = "git" +: args
+        val bashArray = makeBashArray(completeArgs)
+        val command = "git"
+        val cur = "check"// word being completed
+        val prev = "" // prev
+        val fullCommand = bashCompletionScript + s"$command $cur $prev"
+        val variables = Seq(("COMP_WORDS" -> bashArray), ("COMP_CWORD" -> s"${completeArgs.size-1}"), ("COMP_TYPE" -> "TAB"))
+        val process = Process(bashCompletionScript, None, variables: _*)
+        val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
+        // read COMPREPLY
+        // println(res)
+        res.split("\n").map(_.trim)
+      }
+      // TODO UGLY UGLY UGLY
+      (Space ~> token(NotQuoted)).+.flatMap { all => println(all); Space ~> token(NotQuoted, "<command>") ~ (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
+    }
+    
+    def makeBashArray(values: Seq[String]) = values.mkString("ARRAY=(", " ", ")")
+    
+    val test = Command("git-auto-complete")(autoCompleteParser _)(autoCompleteAction)
+    
+    private object NoLog extends ProcessLogger {
+      
+      def info(s: => String): Unit = ()
+  
+      def error(s: => String): Unit = ()
+  
+      def buffer[T](f: => T): T = f
+      
+    }
+    // End auto completion
+    
     // the git command we expose to the user
     val command: Command = Command("git")(s =>  fullCommand(s)){ (state, arg) =>
       val (command, args) = arg
@@ -123,7 +187,7 @@ object SbtGit {
   )
   val projectSettings = Seq(
     // Input task to run git commands directly.
-    commands += GitCommand.command
+    commands ++= Seq(GitCommand.command, GitCommand.test)
   )
 
   /** A Predefined setting to use JGit runner for git. */
