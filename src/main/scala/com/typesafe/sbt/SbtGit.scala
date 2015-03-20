@@ -96,9 +96,9 @@ object SbtGit {
           case Seq() => token(Space) ~> token(NotQuoted, "command")
           //case command :: Nil => NotQuoted.examples(suggestions(state, all): _*) // token(NotQuoted, "branch or whatever") 
           //case all => token(NotQuoted, "another token")
-          case all => Space ~> NotQuoted.examples(suggestions(state, all): _*)
+          case all => NotQuoted.examples(suggestions(state, all): _*)
       }
-      repeatDep(test, SpaceClass)
+      repeatDep(test, token(Space))
     }
     
     def makeBashArray(values: Seq[String]) = values.mkString("ARRAY=(", " ", ")")
