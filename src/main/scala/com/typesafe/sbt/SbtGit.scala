@@ -74,10 +74,15 @@ object SbtGit {
       state
     }
     
-    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
-      val (cmd, args) = t
-      action(state, cmd +: args)
-    }
+//    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
+//      val (cmd, args) = t
+//      action(state, cmd +: args)
+//    }
+    
+      val autoCompleteAction: (State, Seq[String]) => State = { (state, t) =>
+        action(state, t)
+      }
+    
     
     def autoCompleteParser(state: State) = {
 
@@ -92,16 +97,16 @@ object SbtGit {
         val command = "git"
         val cur = "check"// word being completed
         val prev = "" // prev
-        val fullCommand = bashCompletionScript + s"$command $cur $prev"
+        val fullCommand = bashCompletionScript + s" $command $cur $prev"
         val variables = Seq(("COMP_WORDS" -> bashArray), ("COMP_CWORD" -> s"${completeArgs.size-1}"), ("COMP_TYPE" -> "TAB"))
-        val process = Process(bashCompletionScript, None, variables: _*)
+        val process = Process(fullCommand, None, variables: _*)
         val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
         // read COMPREPLY
         // println(res)
         res.split("\n").map(_.trim)
       }
       // TODO UGLY UGLY UGLY
-      (Space ~> token(NotQuoted)).+.flatMap { all => println(all); Space ~> token(NotQuoted, "<command>") ~ (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
+      (Space ~> token(NotQuoted, "<command>")).+.flatMap { all => println(all); (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
     }
     
     def makeBashArray(values: Seq[String]) = values.mkString("ARRAY=(", " ", ")")
