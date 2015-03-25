@@ -72,7 +72,6 @@ object SbtGit {
       def suggestions(state: State, args: Seq[String]): Seq[String] = {
         val extracted = Project.extract(state)
         import extracted._
-        // TODO we need to handle the different modes TAB, ?, !, % etc
         // TODO for now I am cheating, having a echo $COMPREPLY in the bash script
         
         // FIXME & TODO
@@ -81,9 +80,6 @@ object SbtGit {
         val dir = extracted.get(baseDirectory)
         
         val completeArgs = "git" +: args
-        val bashArray = makeBashArray(completeArgs)
-         // val fullCommand = bashCompletionScript + s" $command $cur $prev"
-        val fullCommand = bashCompletionScript
         def completeCurrentWord = {
           val cWord = completeArgs.size-1
           val fullCommand = bashCompletionScript + " " + cWord + " " + completeArgs.mkString(" ")
@@ -97,7 +93,6 @@ object SbtGit {
         val process = completeNextWord
         val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
         // read COMPREPLY
-        // println(res)
         res.split("\n").map(_.trim)
       }
       // TODO UGLY UGLY UGLY
@@ -111,8 +106,6 @@ object SbtGit {
       }
       repeatDep(test, token(Space))
     }
-    
-    def makeBashArray(values: Seq[String]) = values.mkString("", " ", "")
     
     val test = Command("git-auto-complete")(autoCompleteParser _)(autoCompleteAction)
     
