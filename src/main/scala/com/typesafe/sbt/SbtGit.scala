@@ -72,18 +72,29 @@ object SbtGit {
       def suggestions(state: State, args: Seq[String]): Seq[String] = {
         val extracted = Project.extract(state)
         import extracted._
-        val dir = extracted.get(baseDirectory)
         // TODO we need to handle the different modes TAB, ?, !, % etc
         // TODO for now I am cheating, having a echo $COMPREPLY in the bash script
+        
+        // FIXME & TODO
+        // what if bash array is empty?
+        // I am not sure the passing of the array actually works through the env variable does it? double check!
+        val dir = extracted.get(baseDirectory)
+        
         val completeArgs = "git" +: args
         val bashArray = makeBashArray(completeArgs)
-        val command = "git"
-        val cur = "check"// word being completed
-        val prev = "" // prev
          // val fullCommand = bashCompletionScript + s" $command $cur $prev"
         val fullCommand = bashCompletionScript
-        val variables = Seq(("COMP_WORDS" -> bashArray), ("COMP_CWORD" -> s"${completeArgs.size-1}"), ("COMP_TYPE" -> "TAB"))
-        val process = Process(fullCommand, None, variables: _*)
+        def completeCurrentWord = {
+          val cWord = completeArgs.size-1
+          val fullCommand = bashCompletionScript + " " + cWord + " " + completeArgs.mkString(" ")
+          Process(fullCommand, dir)
+        }
+        def completeNextWord = {
+          val cWord = completeArgs.size
+          val fullCommand = bashCompletionScript + " " + cWord + " " + completeArgs.mkString(" ")
+          Process(fullCommand, dir)
+        }
+        val process = completeNextWord
         val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
         // read COMPREPLY
         // println(res)
@@ -93,7 +104,7 @@ object SbtGit {
       // (token(Space) ~> token(NotQuoted, "<command>")).flatMap { all => println(all); (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
       def test(parts: Seq[String]) : Parser[String] = 
         parts match {
-          case Seq() => token(Space) ~> token(NotQuoted, "command")
+          case Seq() => token(Space) ~> NotQuoted.examples(suggestions(state, Seq()): _*)
           //case command :: Nil => NotQuoted.examples(suggestions(state, all): _*) // token(NotQuoted, "branch or whatever") 
           //case all => token(NotQuoted, "another token")
           case all => NotQuoted.examples(suggestions(state, all): _*)
@@ -101,7 +112,7 @@ object SbtGit {
       repeatDep(test, token(Space))
     }
     
-    def makeBashArray(values: Seq[String]) = values.mkString("ARRAY=(", " ", ")")
+    def makeBashArray(values: Seq[String]) = values.mkString("", " ", "")
     
     val test = Command("git-auto-complete")(autoCompleteParser _)(autoCompleteAction)
     
