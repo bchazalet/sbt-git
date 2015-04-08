@@ -7,6 +7,7 @@ import scala.util.logging.ConsoleLogger
 import com.typesafe.sbt.git.GitRunner
 import com.typesafe.sbt.git.ReadableGit
 import com.typesafe.sbt.git.DefaultReadableGit
+import java.nio.charset.Charset
 
 /** This plugin has all the basic 'git' functionality for other plugins. */
 object SbtGit {
@@ -56,8 +57,24 @@ object SbtGit {
     }
 
     // bash auto completion
-    val bashCompletionScript = "/Users/bchazalet/.sbt-git-completion.bash" // intermediate
-    val autoCompleteScript = "/Users/bchazalet/.git-completion.bash" // the real thing
+    // read the 'lifting' script from resources and write it in a temporary place
+    val charset = Charset.forName("UTF-8")
+    
+    def copyResource(name: String): File = {
+      val stream = getClass.getClassLoader.getResourceAsStream(name)
+      val content = IO.readStream(stream, charset)
+      stream.close
+      val bashCompletionScript =  IO.temporaryDirectory / name 
+      
+      println(bashCompletionScript)
+      IO.write(bashCompletionScript, content, charset, false)
+      bashCompletionScript
+    }
+    val bashCompletionScript = copyResource("bridging-completion-script.bash")
+    bashCompletionScript.setExecutable(true)
+    
+    // read the git-completion script from resources and write it in a temporary place too
+    val autoCompleteScript = copyResource("git-completion.bash") // the real thing
       
 //    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
 //      val (cmd, args) = t
@@ -83,12 +100,12 @@ object SbtGit {
         val completeArgs = "git" +: args
         def completeCurrentWord = {
           val cWord = completeArgs.size-1
-          val fullCommand = bashCompletionScript + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
+          val fullCommand = bashCompletionScript.getAbsolutePath + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
           Process(fullCommand, dir)
         }
         def completeNextWord = {
           val cWord = completeArgs.size
-          val fullCommand = bashCompletionScript + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
+          val fullCommand = bashCompletionScript.getAbsolutePath + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
           Process(fullCommand, dir)
         }
         val process = completeNextWord
