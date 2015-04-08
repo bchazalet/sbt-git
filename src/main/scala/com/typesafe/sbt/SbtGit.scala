@@ -56,8 +56,9 @@ object SbtGit {
     }
 
     // bash auto completion
-    val bashCompletionScript = "/Users/bchazalet/.sbt-git-completion.bash"
-    
+    val bashCompletionScript = "/Users/bchazalet/.sbt-git-completion.bash" // intermediate
+    val autoCompleteScript = "/Users/bchazalet/.git-completion.bash" // the real thing
+      
 //    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
 //      val (cmd, args) = t
 //      action(state, cmd +: args)
@@ -82,12 +83,12 @@ object SbtGit {
         val completeArgs = "git" +: args
         def completeCurrentWord = {
           val cWord = completeArgs.size-1
-          val fullCommand = bashCompletionScript + " " + cWord + " " + completeArgs.mkString(" ")
+          val fullCommand = bashCompletionScript + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
           Process(fullCommand, dir)
         }
         def completeNextWord = {
           val cWord = completeArgs.size
-          val fullCommand = bashCompletionScript + " " + cWord + " " + completeArgs.mkString(" ")
+          val fullCommand = bashCompletionScript + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
           Process(fullCommand, dir)
         }
         val process = completeNextWord
