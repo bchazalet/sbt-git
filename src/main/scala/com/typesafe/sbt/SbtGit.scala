@@ -76,11 +76,6 @@ object SbtGit {
     // read the git-completion script from resources and write it in a temporary place too
     val autoCompleteScript = copyResource("git-completion.bash") // the real thing
       
-//    val autoCompleteAction: (State, (String, Seq[String])) => State = { (state, t) =>
-//      val (cmd, args) = t
-//      action(state, cmd +: args)
-//    }
-    
     val autoCompleteAction: (State, Seq[String]) => State = { (state, t) =>
       action(state, t)
     }
@@ -90,39 +85,37 @@ object SbtGit {
       def suggestions(state: State, args: Seq[String]): Seq[String] = {
         val extracted = Project.extract(state)
         import extracted._
-        // TODO for now I am cheating, having a echo $COMPREPLY in the bash script
         
         // FIXME & TODO
         // what if bash array is empty?
-        // I am not sure the passing of the array actually works through the env variable does it? double check!
         val dir = extracted.get(baseDirectory)
         
         val completeArgs = "git" +: args
-        def completeCurrentWord = {
-          val cWord = completeArgs.size-1
-          val fullCommand = bashCompletionScript.getAbsolutePath + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
-          Process(fullCommand, dir)
-        }
+        
         def completeNextWord = {
           val cWord = completeArgs.size
           val fullCommand = bashCompletionScript.getAbsolutePath + " " + autoCompleteScript + " " + cWord + " " + completeArgs.mkString(" ")
           Process(fullCommand, dir)
         }
+        
         val process = completeNextWord
         val res = process !! NoLog // TODO we don't need a gitLogger, but how do I use that !!: operator?
         // read COMPREPLY
         res.split("\n").map(_.trim)
       }
-      // TODO UGLY UGLY UGLY
-      // (token(Space) ~> token(NotQuoted, "<command>")).flatMap { all => println(all); (Space ~> token(NotQuoted.examples(suggestions(state, all): _*))).*}
-      def test(parts: Seq[String]) : Parser[String] = 
-        parts match {
-          case Seq() => token(Space) ~> NotQuoted.examples(suggestions(state, Seq()): _*)
-          //case command :: Nil => NotQuoted.examples(suggestions(state, all): _*) // token(NotQuoted, "branch or whatever") 
-          //case all => token(NotQuoted, "another token")
-          case all => NotQuoted.examples(suggestions(state, all): _*)
+      
+      val gitArgsParser: Parser[Seq[String]] = {
+        
+        def loop(previous: Seq[String]): Parser[Seq[String]] = {
+          val p = token(Space) ~> NotSpace.examples(suggestions(state, previous): _*).flatMap(res => loop(previous :+ res))
+          p ?? previous
+        }
+        
+        loop(Vector())
+        
       }
-      repeatDep(test, token(Space))
+    
+      gitArgsParser
     }
     
     val test = Command("git-auto-complete")(autoCompleteParser _)(autoCompleteAction)
